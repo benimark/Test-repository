@@ -27,8 +27,13 @@ export default function App() {
           variant="outline"
           className="animate-rise motion-reduce:animate-none max-w-full border-white/15 bg-white/5 px-3 py-1 text-[0.7rem] tracking-[0.16em] whitespace-normal uppercase backdrop-blur-sm"
         >
-          <Sparkles aria-hidden="true" />
-          React · Tailwind · shadcn/ui · Express
+          {/* The icon sits inside the label rather than beside it as a flex item, so
+              that when the text breaks onto a second line on narrow viewports both
+              lines stay centred instead of the icon being pushed to the far edge. */}
+          <span>
+            <Sparkles aria-hidden="true" className="mr-1 inline size-3 align-[-0.125em]" />
+            React · Tailwind · shadcn/ui · Express
+          </span>
         </Badge>
 
         {/* `hyphens-auto` keeps "eseményhorizonton" from overflowing narrow viewports. */}
