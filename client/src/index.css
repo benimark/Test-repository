@@ -107,13 +107,14 @@
     }
   }
 
+  /* Scaled by each star's own brightness (set inline) so the sky keeps its depth. */
   @keyframes twinkle {
     0%,
     100% {
-      opacity: 0.15;
+      opacity: calc(var(--star-opacity, 1) * 0.25);
     }
     50% {
-      opacity: 1;
+      opacity: var(--star-opacity, 1);
     }
   }
 

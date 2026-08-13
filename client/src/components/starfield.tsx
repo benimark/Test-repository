@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+
 import { cn } from '@/lib/utils'
 
 const STAR_COUNT = 160
@@ -34,15 +36,22 @@ export function Starfield({ className }: { className?: string }) {
         <span
           key={index}
           className="animate-twinkle motion-reduce:animate-none absolute rounded-full bg-white"
-          style={{
-            top: `${star.top}%`,
-            left: `${star.left}%`,
-            width: `${star.size}px`,
-            height: `${star.size}px`,
-            opacity: star.opacity,
-            animationDelay: `${star.delay}s`,
-            animationDuration: `${star.duration}s`,
-          }}
+          style={
+            {
+              top: `${star.top}%`,
+              left: `${star.left}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              // The twinkle keyframes animate `opacity`, and an animation outranks the
+              // inline style attribute — so the brightness has to reach them through a
+              // custom property. The plain `opacity` below is what remains once
+              // `motion-reduce` switches the animation off.
+              '--star-opacity': star.opacity,
+              opacity: star.opacity,
+              animationDelay: `${star.delay}s`,
+              animationDuration: `${star.duration}s`,
+            } as CSSProperties
+          }
         />
       ))}
     </div>
