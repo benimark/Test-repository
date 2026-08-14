@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="disk" x1="0" y1="0" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a855f7" />
+      <stop offset=".45" stop-color="#ffb347" />
+      <stop offset=".62" stop-color="#ffffff" />
+      <stop offset="1" stop-color="#38bdf8" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#04040a" />
+  <!-- Far half of the accretion disk, passing behind the sphere. -->
+  <ellipse cx="32" cy="32" rx="25" ry="8" fill="none" stroke="url(#disk)" stroke-width="5" />
+  <!-- The horizon, with the disk light bent around it into a full circle. -->
+  <circle cx="32" cy="32" r="12.5" fill="none" stroke="#ffd7a1" stroke-width="2" />
+  <circle cx="32" cy="32" r="11.5" fill="#04040a" />
+  <!-- Near half, crossing in front of the sphere. -->
+  <path d="M7 32a25 8 0 0 0 50 0" fill="none" stroke="url(#disk)" stroke-width="5" />
+</svg>
