@@ -57,7 +57,16 @@ export default function App() {
             </a>
           </Button>
           <Button asChild size="lg" variant="outline">
-            <a href={REPOSITORY_URL} target="_blank" rel="noreferrer">
+            {/* The new tab has to be part of the accessible name: no screen reader
+                announces `target="_blank"` on its own, so otherwise the user lands in a
+                tab that Back cannot leave without ever being told they moved. The visible
+                label stays the first words of it, so speech control still matches it. */}
+            <a
+              href={REPOSITORY_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Forráskód (új lapon nyílik meg)"
+            >
               Forráskód
             </a>
           </Button>

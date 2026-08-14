@@ -50,4 +50,19 @@ describe('App', () => {
 
     expect(await screen.findByText('Nem érhető el')).toBeInTheDocument()
   })
+
+  // The repository link is the only control that leaves the page for a new tab. Screen
+  // readers do not announce `target="_blank"`, so the warning has to be part of the
+  // accessible name — otherwise the user is moved somewhere Back no longer returns them
+  // from, with no notice that it happened.
+  it('warns that the repository link opens a new tab', () => {
+    stubFetch(async () => jsonResponse({ status: 'ok', uptime: 12, timestamp: '' }))
+
+    render(<App />)
+
+    const link = screen.getByRole('link', { name: /Forráskód/ })
+
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAccessibleName('Forráskód (új lapon nyílik meg)')
+  })
 })
