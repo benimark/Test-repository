@@ -4,11 +4,13 @@ import { describe, expect, it } from 'vitest'
 import { SystemStatus } from '@/components/system-status'
 import type { HealthState } from '@/hooks/use-health'
 
-const STATES: HealthState[] = [
-  { status: 'loading' },
-  { status: 'online', uptime: 90 },
-  { status: 'offline' },
+const ANNOUNCEMENTS: [HealthState, string][] = [
+  [{ status: 'loading' }, 'Kapcsolódás…'],
+  [{ status: 'online', uptime: 90 }, 'Online'],
+  [{ status: 'offline' }, 'Nem érhető el'],
 ]
+
+const STATES = ANNOUNCEMENTS.map(([health]) => health)
 
 describe('SystemStatus', () => {
   it.each(STATES)('holds still in the $status state when motion is reduced', (health) => {
@@ -19,6 +21,15 @@ describe('SystemStatus', () => {
     for (const element of animated) {
       expect(element.className).toContain('motion-reduce:animate-none')
     }
+  })
+
+  // The health check answers after the page has been read, so its result has to be
+  // announced, not only painted — otherwise a screen reader user who has already passed
+  // this tile is never told whether the backend replied.
+  it.each(ANNOUNCEMENTS)('announces the $status state', (health, label) => {
+    render(<SystemStatus health={health} />)
+
+    expect(screen.getByRole('status')).toHaveTextContent(label)
   })
 
   // The unit the panel prints has to agree with the threshold that picked it: the

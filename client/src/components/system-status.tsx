@@ -43,7 +43,10 @@ export function SystemStatus({ health }: { health: HealthState }) {
   return (
     <div className="grid w-full divide-y divide-white/10 rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
       <Tile label="Backend">
-        <span className="inline-flex items-center gap-2">
+        {/* The health check lands after the page has been read, so `role="status"` lets
+            the answer reach a screen reader user instead of only changing the colour of
+            a dot they cannot see. */}
+        <span role="status" className="inline-flex items-center gap-2">
           <span className={cn('size-2 rounded-full', STATUS_DOTS[health.status])} />
           {STATUS_LABELS[health.status]}
         </span>
