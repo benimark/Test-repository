@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { STATUS_CODES } from 'node:http'
 import { extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express, { type ErrorRequestHandler, type Express } from 'express'
@@ -22,6 +23,32 @@ export interface HealthPayload {
  */
 export function servesSpaShell(method: string, path: string): boolean {
   return (method === 'GET' || method === 'HEAD') && extname(path) === ''
+}
+
+/**
+ * The status a failed request should be answered with.
+ *
+ * Middleware that rejects a request the caller got wrong — a body that is not JSON, one
+ * over the size limit — throws an error that already names its own 4xx status. Answering
+ * those with 500 tells the caller to retry something that can never succeed, and files
+ * every junk request under "the server is broken" for whatever reads the logs.
+ *
+ * Only a plausible HTTP status is taken from the error; anything else means nobody
+ * classified this failure, which makes it a genuine server fault.
+ */
+export function errorStatus(error: unknown): number {
+  if (typeof error !== 'object' || error === null) {
+    return 500
+  }
+
+  // http-errors defines both of these on the prototype rather than as own properties, so
+  // this has to stay a plain read — an own-key check would miss them entirely.
+  const { status, statusCode } = error as { status?: unknown; statusCode?: unknown }
+  const named = typeof status === 'number' ? status : statusCode
+
+  return typeof named === 'number' && Number.isInteger(named) && named >= 400 && named <= 599
+    ? named
+    : 500
 }
 
 /**
@@ -63,8 +90,15 @@ export function createApp(): Express {
   }
 
   const handleError: ErrorRequestHandler = (error, _req, res, _next) => {
-    console.error(error)
-    res.status(500).json({ error: 'Internal Server Error' })
+    const status = errorStatus(error)
+
+    // A stack trace is what a server fault deserves. Printing one for every malformed
+    // request lets any caller fill the log with noise that reads like our own failures.
+    if (status >= 500) {
+      console.error(error)
+    }
+
+    res.status(status).json({ error: STATUS_CODES[status] ?? 'Internal Server Error' })
   }
   app.use(handleError)
 
