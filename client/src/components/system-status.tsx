@@ -19,7 +19,7 @@ const STATUS_DOTS: Record<HealthState['status'], string> = {
 
 function formatUptime(seconds: number): string {
   if (seconds < 60) {
-    return `${Math.round(seconds)} mp`
+    return `${Math.floor(seconds)} mp`
   }
   if (seconds < 3600) {
     return `${Math.floor(seconds / 60)} perc`
