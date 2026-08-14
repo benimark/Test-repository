@@ -1,9 +1,16 @@
 import { cn } from '@/lib/utils'
 
-/** The tilted ring of glowing matter, drawn twice: once behind the sphere and once in front. */
+/**
+ * The tilted ring of glowing matter, drawn twice: once behind the sphere and once in front.
+ *
+ * The perspective rides in the transform rather than on the shared parent, because the
+ * near copy is drawn inside a `mask-image` wrapper and a mask forces `transform-style:
+ * flat`. A parent `perspective` would reach the far copy and be flattened away before the
+ * near one, tilting the two halves into different ellipses instead of one ring.
+ */
 function AccretionDisk() {
   return (
-    <div className="absolute inset-0 [transform:rotateX(74deg)]">
+    <div className="absolute inset-0 [transform:perspective(1400px)_rotateX(74deg)]">
       <div className="animate-accretion motion-reduce:animate-none absolute inset-0 rounded-full opacity-90 blur-md [background:conic-gradient(from_0deg,transparent_0deg,#a855f7_40deg,#ffb347_120deg,#ffffff_168deg,#ffb347_210deg,#38bdf8_290deg,transparent_360deg)] [mask-image:radial-gradient(circle,transparent_33%,#000_40%,#000_66%,transparent_76%)]" />
       <div className="animate-accretion-slow motion-reduce:animate-none absolute inset-[7%] rounded-full opacity-70 blur-xl [background:conic-gradient(from_180deg,transparent_0deg,#ffb347_90deg,#ffffff_150deg,#a855f7_255deg,transparent_360deg)] [mask-image:radial-gradient(circle,transparent_36%,#000_45%,#000_70%,transparent_82%)]" />
     </div>
@@ -22,7 +29,7 @@ export function BlackHole({ className }: { className?: string }) {
       className={cn('pointer-events-none absolute inset-0 overflow-hidden', className)}
     >
       {/* Sunk below the fold so the disk rises from the bottom edge and leaves the copy clear. */}
-      <div className="absolute top-[88%] left-1/2 aspect-square w-[min(165vmin,1180px)] -translate-x-1/2 -translate-y-1/2 [perspective:1400px]">
+      <div className="absolute top-[88%] left-1/2 aspect-square w-[min(165vmin,1180px)] -translate-x-1/2 -translate-y-1/2">
         {/* Gravitational glow bleeding out past the disk. */}
         <div className="animate-halo motion-reduce:animate-none absolute inset-[20%] rounded-full bg-[radial-gradient(circle,rgba(255,179,71,0.42)_0%,rgba(168,85,247,0.22)_45%,transparent_70%)] blur-3xl" />
 
