@@ -1,6 +1,7 @@
+import { join } from 'node:path'
 import request from 'supertest'
 import { describe, expect, it } from 'vitest'
-import { createApp, errorStatus, servesSpaShell } from './app.ts'
+import { cacheControlFor, createApp, errorStatus, servesSpaShell } from './app.ts'
 
 describe('GET /api/health', () => {
   it('reports that the server is up', async () => {
@@ -92,4 +93,29 @@ describe('the SPA shell fallback', () => {
   it.each(['POST', 'PUT', 'DELETE'])('does not answer a %s request with the shell', (method) => {
     expect(servesSpaShell(method, '/valami')).toBe(false)
   })
+})
+
+// Same reason as above: the build is git-ignored, so the policy is tested as a function
+// rather than through a request that would quietly cover nothing on a fresh checkout.
+describe('cacheControlFor', () => {
+  // A rebuild writes a different hash into the name, so the bytes behind one of these URLs
+  // can never change. Without saying so the fingerprint buys nothing: the browser still
+  // asks about every asset on every visit, only to be told each one is unchanged.
+  it.each([
+    join('assets', 'index-C0FFEE.js'),
+    join('assets', 'index-C0FFEE.css'),
+    join('assets', 'logo-D3ADB33F.svg'),
+  ])('lets the browser keep the fingerprinted %s', (path) => {
+    expect(cacheControlFor(path)).toBe('public, max-age=31536000, immutable')
+  })
+
+  // `index.html` keeps its name across every deploy while its contents name the current
+  // build, so a cached copy is how a browser ends up asking for assets that no longer
+  // exist — the blank page `servesSpaShell` exists to turn back into a legible 404.
+  it.each(['index.html', 'robots.txt', join('img', 'og-card.png')])(
+    'makes the unfingerprinted %s revalidate',
+    (path) => {
+      expect(cacheControlFor(path)).toBe('no-cache')
+    },
+  )
 })

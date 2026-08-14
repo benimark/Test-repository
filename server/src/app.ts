@@ -1,11 +1,14 @@
 import { existsSync } from 'node:fs'
 import { STATUS_CODES } from 'node:http'
-import { extname, join } from 'node:path'
+import { extname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express, { type ErrorRequestHandler, type Express } from 'express'
 
 /** Vite build output, as configured in `vite.config.ts`. */
 const CLIENT_DIST = fileURLToPath(new URL('../../dist/client', import.meta.url))
+
+/** Where Vite puts the files it fingerprints — `build.assetsDir`, which we leave at its default. */
+const FINGERPRINTED_DIR = 'assets'
 
 export interface HealthPayload {
   status: 'ok'
@@ -23,6 +26,24 @@ export interface HealthPayload {
  */
 export function servesSpaShell(method: string, path: string): boolean {
   return (method === 'GET' || method === 'HEAD') && extname(path) === ''
+}
+
+/**
+ * How long a built file may be reused, keyed by its path inside `dist/client`.
+ *
+ * Vite writes a content hash into every name under `assets/`, so a rebuild produces a new
+ * URL rather than new bytes at the old one. Those can be kept forever, and saying so is the
+ * whole point of the hash — otherwise the browser still asks about every asset on every
+ * visit and is told each time that nothing changed.
+ *
+ * `index.html` is the opposite. Its name never changes while its contents name the current
+ * build, so a cached copy is exactly how a browser comes to request assets a redeploy has
+ * already deleted — the failure `servesSpaShell` exists to keep legible.
+ */
+export function cacheControlFor(pathInBuild: string): string {
+  return pathInBuild.split(sep)[0] === FINGERPRINTED_DIR
+    ? 'public, max-age=31536000, immutable'
+    : 'no-cache'
 }
 
 /**
@@ -79,13 +100,21 @@ export function createApp(): Express {
   // that job, so there is nothing to serve here yet.
   const clientEntry = join(CLIENT_DIST, 'index.html')
   if (existsSync(clientEntry)) {
-    app.use(express.static(CLIENT_DIST))
+    app.use(
+      express.static(CLIENT_DIST, {
+        setHeaders: (res, filePath) => {
+          res.setHeader('Cache-Control', cacheControlFor(relative(CLIENT_DIST, filePath)))
+        },
+      }),
+    )
     app.use((req, res, next) => {
       if (!servesSpaShell(req.method, req.path)) {
         next()
         return
       }
-      res.sendFile(clientEntry)
+      // The shell reaches deep links through here rather than through the static handler
+      // above, so it has to be told to revalidate on this path too.
+      res.sendFile(clientEntry, { headers: { 'Cache-Control': cacheControlFor('index.html') } })
     })
   }
 
