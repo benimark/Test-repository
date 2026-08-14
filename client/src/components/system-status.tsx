@@ -12,7 +12,7 @@ const STATUS_LABELS: Record<HealthState['status'], string> = {
 }
 
 const STATUS_DOTS: Record<HealthState['status'], string> = {
-  loading: 'bg-muted-foreground animate-pulse',
+  loading: 'bg-muted-foreground animate-pulse motion-reduce:animate-none',
   online: 'bg-emerald-400 shadow-[0_0_10px_2px_rgba(52,211,153,0.7)]',
   offline: 'bg-destructive',
 }
