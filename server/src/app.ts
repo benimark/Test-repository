@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express, { type ErrorRequestHandler, type Express } from 'express'
 
@@ -10,6 +10,18 @@ export interface HealthPayload {
   status: 'ok'
   uptime: number
   timestamp: string
+}
+
+/**
+ * Whether the SPA shell is the right answer for a request that matched no static file.
+ *
+ * Only navigations qualify. A request naming a file — most often a hashed asset that a
+ * cached `index.html` still points at after a redeploy — has to stay a 404: answering it
+ * with the shell serves HTML under a `.js` URL, which the browser rejects on the module
+ * MIME check, leaving a blank page instead of one missing-file error in the console.
+ */
+export function servesSpaShell(method: string, path: string): boolean {
+  return (method === 'GET' || method === 'HEAD') && extname(path) === ''
 }
 
 /**
@@ -41,7 +53,11 @@ export function createApp(): Express {
   const clientEntry = join(CLIENT_DIST, 'index.html')
   if (existsSync(clientEntry)) {
     app.use(express.static(CLIENT_DIST))
-    app.use((_req, res) => {
+    app.use((req, res, next) => {
+      if (!servesSpaShell(req.method, req.path)) {
+        next()
+        return
+      }
       res.sendFile(clientEntry)
     })
   }

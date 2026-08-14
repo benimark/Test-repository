@@ -1,6 +1,6 @@
 import request from 'supertest'
 import { describe, expect, it } from 'vitest'
-import { createApp } from './app.ts'
+import { createApp, servesSpaShell } from './app.ts'
 
 describe('GET /api/health', () => {
   it('reports that the server is up', async () => {
@@ -19,5 +19,27 @@ describe('unknown API routes', () => {
 
     expect(response.status).toBe(404)
     expect(response.body).toEqual({ error: 'Not Found' })
+  })
+})
+
+// Driven directly rather than through supertest because the fallback only registers when
+// `dist/client` exists, and the build is git-ignored — a request-level test would silently
+// stop covering anything on a fresh checkout.
+describe('the SPA shell fallback', () => {
+  it.each(['/', '/valami', '/egy/mely/link'])('answers the navigation %s', (path) => {
+    expect(servesSpaShell('GET', path)).toBe(true)
+  })
+
+  // A request that names a file is not a navigation. Serving it the shell would hand the
+  // browser HTML under a `.js` URL, which fails the module MIME check and blanks the page.
+  it.each(['/assets/index-C0FFEE.js', '/assets/index-C0FFEE.css', '/favicon.ico'])(
+    'leaves the missing file %s to 404',
+    (path) => {
+      expect(servesSpaShell('GET', path)).toBe(false)
+    },
+  )
+
+  it.each(['POST', 'PUT', 'DELETE'])('does not answer a %s request with the shell', (method) => {
+    expect(servesSpaShell(method, '/valami')).toBe(false)
   })
 })
