@@ -1,14 +1,15 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import App from '@/App'
+import { HEALTH_TIMEOUT_MS } from '@/hooks/use-health'
 
 /** Minimal stand-in for the parts of `Response` that `useHealth` touches. */
 function jsonResponse(payload: unknown): Response {
   return { ok: true, status: 200, json: async () => payload } as Response
 }
 
-function stubFetch(respond: () => Promise<Response>) {
+function stubFetch(respond: (input: string, init?: RequestInit) => Promise<Response>) {
   const fetchMock = vi.fn(respond)
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
@@ -16,6 +17,7 @@ function stubFetch(respond: () => Promise<Response>) {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 describe('App', () => {
@@ -49,6 +51,33 @@ describe('App', () => {
     render(<App />)
 
     expect(await screen.findByText('Nem érhető el')).toBeInTheDocument()
+  })
+
+  // A refused connection is not the only way to be unreachable, and it is not the common
+  // one: a backend that accepts the request and then never answers leaves the tile on
+  // "Kapcsolódás…" for as long as the tab stays open, because nothing else ever settles
+  // the request. The panel exists to say whether the API answers, so silence has to
+  // become an answer — and only a state change reaches `role="status"`.
+  it('reports the backend as unreachable when the health check never answers', async () => {
+    vi.useFakeTimers()
+    stubFetch(
+      (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted.', 'AbortError'))
+          })
+        }),
+    )
+
+    render(<App />)
+
+    expect(screen.getByText('Kapcsolódás…')).toBeInTheDocument()
+
+    await act(async () => {
+      vi.advanceTimersByTime(HEALTH_TIMEOUT_MS)
+    })
+
+    expect(screen.getByText('Nem érhető el')).toBeInTheDocument()
   })
 
   // The repository link is the only control that leaves the page for a new tab. Screen
