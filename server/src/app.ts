@@ -73,6 +73,28 @@ export function errorStatus(error: unknown): number {
 }
 
 /**
+ * What to say when the server comes up without the SPA it is supposed to ship, or `null`
+ * when that is nothing to write home about.
+ *
+ * Serving no client is the normal state in dev — Vite serves it, and this process is only
+ * the API. Under `npm start`, which sets `NODE_ENV=production`, it means `npm run build`
+ * never ran. Nothing else reports that: the bootstrap still announces its port, `/api`
+ * still answers, and the only symptom is that every navigation falls through to Express's
+ * own `Cannot GET /`, which names no cause. A start that serves no site has to say so
+ * while somebody is still reading the output.
+ */
+export function missingClientBuildWarning(
+  hasClientBuild: boolean,
+  nodeEnv: string | undefined,
+): string | null {
+  if (hasClientBuild || nodeEnv !== 'production') {
+    return null
+  }
+
+  return `No client build at ${CLIENT_DIST} — serving the API only, so every page request will 404. Run \`npm run build\` before \`npm start\`.`
+}
+
+/**
  * Builds the Express application without binding a port, so tests can drive it
  * directly and `index.ts` stays a thin bootstrap.
  */
@@ -99,7 +121,14 @@ export function createApp(): Express {
   // In production this server also ships the built SPA. In dev the Vite server does
   // that job, so there is nothing to serve here yet.
   const clientEntry = join(CLIENT_DIST, 'index.html')
-  if (existsSync(clientEntry)) {
+  const hasClientBuild = existsSync(clientEntry)
+
+  const warning = missingClientBuildWarning(hasClientBuild, process.env.NODE_ENV)
+  if (warning !== null) {
+    console.warn(warning)
+  }
+
+  if (hasClientBuild) {
     app.use(
       express.static(CLIENT_DIST, {
         setHeaders: (res, filePath) => {

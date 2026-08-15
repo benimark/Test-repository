@@ -1,7 +1,13 @@
 import { join } from 'node:path'
 import request from 'supertest'
 import { describe, expect, it } from 'vitest'
-import { cacheControlFor, createApp, errorStatus, servesSpaShell } from './app.ts'
+import {
+  cacheControlFor,
+  createApp,
+  errorStatus,
+  missingClientBuildWarning,
+  servesSpaShell,
+} from './app.ts'
 
 describe('GET /api/health', () => {
   it('reports that the server is up', async () => {
@@ -118,4 +124,29 @@ describe('cacheControlFor', () => {
       expect(cacheControlFor(path)).toBe('no-cache')
     },
   )
+})
+
+// A server that never got a build looks exactly like a healthy one from the outside: the
+// bootstrap announces its port, `/api` answers, and only a navigation gives it away — as
+// Express's own `Cannot GET /`, which names nothing that would explain it. Serving no SPA
+// is the normal state in dev, where Vite serves the client instead. Under `npm start`,
+// which sets `NODE_ENV=production`, it means `npm run build` never ran, and the one moment
+// anybody is watching the output is the start it stays silent through.
+describe('missingClientBuildWarning', () => {
+  it('names the command a production start without a build is missing', () => {
+    const warning = missingClientBuildWarning(false, 'production')
+
+    expect(warning).toContain('npm run build')
+  })
+
+  // Warning outside that one case would be crying wolf: every dev run and every test that
+  // builds the app would print it, which is how a real warning stops being read.
+  it.each([
+    ['the build is there', true, 'production'],
+    ['Vite serves the client in dev', false, 'development'],
+    ['a test drives the app directly', false, 'test'],
+    ['nothing named an environment', false, undefined],
+  ])('stays quiet when %s', (_case, hasClientBuild, nodeEnv) => {
+    expect(missingClientBuildWarning(hasClientBuild, nodeEnv)).toBeNull()
+  })
 })
