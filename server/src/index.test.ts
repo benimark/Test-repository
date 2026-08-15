@@ -31,7 +31,7 @@ interface Bootstrap {
   kill: () => void
 }
 
-function startBootstrap(port: number): Bootstrap {
+function startBootstrap(port: number | string): Bootstrap {
   const child = spawn(TSX, [BOOTSTRAP], {
     env: { ...process.env, PORT: String(port) },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -113,6 +113,40 @@ describe('the server bootstrap', () => {
     } finally {
       release()
     }
+  }, 30_000)
+
+  // `PORT=` is how the variable arrives when whatever was meant to fill it did not, and
+  // an empty string is not a port. It used to reach `listen` as `0` — the documented way
+  // to ask for *any* free port — so the server came up on an unpredictable one and said
+  // so in the same words a healthy start uses. Nothing downstream follows it there: the
+  // reverse proxy, the health check and the Vite dev proxy all go to the default.
+  it('does not wander onto a random port when PORT is set but empty', async () => {
+    const bootstrap = startBootstrap('')
+    running.push(bootstrap)
+
+    // The default may well be taken on the machine running this, in which case the
+    // bootstrap fails loudly and announces nothing — also fine. Coming up *somewhere
+    // else* is the outcome under test, and it is the only one that stays quiet about it.
+    await waitFor(() => /API listening|EADDRINUSE|PORT/.test(bootstrap.output()), 10_000)
+
+    const announced = bootstrap.output().match(/API listening on http:\/\/localhost:(\d+)/)
+    expect(announced?.[1] ?? '3001').toBe('3001')
+  }, 30_000)
+
+  // Everything else `listen` cannot take, it rejects from inside `node:net` as a
+  // RangeError naming `options.port` — thrown synchronously, before the `error` handler
+  // below it is registered. The process does stop, but what reaches the operator is a
+  // stack trace through node internals rather than the name of the variable to edit.
+  it.each(['abc', '99999'])('refuses to start on PORT=%s and says which value', async (raw) => {
+    const bootstrap = startBootstrap(raw)
+    running.push(bootstrap)
+    const code = await bootstrap.exited
+
+    expect(bootstrap.output()).not.toContain('API listening')
+    expect(bootstrap.output()).toContain('PORT')
+    expect(bootstrap.output()).toContain(raw)
+    expect(bootstrap.output()).not.toContain('node:net')
+    expect(code).not.toBe(0)
   }, 30_000)
 })
 

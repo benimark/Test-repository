@@ -94,6 +94,47 @@ export function missingClientBuildWarning(
   return `No client build at ${CLIENT_DIST} — serving the API only, so every page request will 404. Run \`npm run build\` before \`npm start\`.`
 }
 
+/** The largest port number `listen` will take. */
+const MAX_PORT = 65535
+
+/**
+ * The port to bind, from the raw `PORT` environment variable.
+ *
+ * `listen` accepts far less than an environment variable can hold, and it is worth one
+ * check here because of what it does with the difference. An empty `PORT` — the state the
+ * variable is in whenever whatever was meant to fill it did not, as with `docker run -e
+ * PORT` or a compose file interpolating an unset variable — reaches it as `0`, which is
+ * the documented way to ask for *any* free port. So the least deliberate value there is
+ * starts a server on an unpredictable port and announces it in the same words a healthy
+ * start uses, while the reverse proxy, the health check and the Vite dev proxy all keep
+ * going to the default. Nothing chose that port, so it is the default that was meant.
+ *
+ * Anything else `listen` rejects itself, but from inside `node:net` and synchronously —
+ * before the bootstrap has registered the `error` handler that would explain it — so the
+ * operator gets a RangeError about `options.port` rather than the name of the variable to
+ * edit. Naming it here costs one throw.
+ */
+export function resolvePort(raw: string | undefined, fallback: number): number {
+  const value = raw?.trim() ?? ''
+
+  if (value === '') {
+    return fallback
+  }
+
+  // Deliberately stricter than `Number`, which also takes `0x1f90`, `1e3` and `Infinity`.
+  // None of those is a port anybody typed, and each would bind a different one than it looks.
+  const port = /^\d+$/.test(value) ? Number(value) : Number.NaN
+
+  if (Number.isNaN(port) || port > MAX_PORT) {
+    throw new Error(
+      `PORT must be a whole number between 0 and ${MAX_PORT}, but it is "${raw}". ` +
+        'Leave it unset to use the default.',
+    )
+  }
+
+  return port
+}
+
 /**
  * Builds the Express application without binding a port, so tests can drive it
  * directly and `index.ts` stays a thin bootstrap.

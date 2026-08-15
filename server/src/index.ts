@@ -1,7 +1,18 @@
 import type { AddressInfo } from 'node:net'
-import { createApp } from './app.ts'
+import { createApp, resolvePort } from './app.ts'
 
-const port = Number(process.env.PORT ?? 3001)
+/** What `vite.config.ts` proxies `/api` to in dev, and what the README documents. */
+const DEFAULT_PORT = 3001
+
+let port: number
+try {
+  port = resolvePort(process.env.PORT, DEFAULT_PORT)
+} catch (error) {
+  // A port that cannot be bound is a start that cannot be finished, and the message says
+  // which variable to edit — which the RangeError from inside `listen` does not.
+  console.error(error instanceof Error ? error.message : error)
+  process.exit(1)
+}
 
 const server = createApp().listen(port)
 

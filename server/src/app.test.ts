@@ -6,6 +6,7 @@ import {
   createApp,
   errorStatus,
   missingClientBuildWarning,
+  resolvePort,
   servesSpaShell,
 } from './app.ts'
 
@@ -148,5 +149,51 @@ describe('missingClientBuildWarning', () => {
     ['nothing named an environment', false, undefined],
   ])('stays quiet when %s', (_case, hasClientBuild, nodeEnv) => {
     expect(missingClientBuildWarning(hasClientBuild, nodeEnv)).toBeNull()
+  })
+})
+
+// `listen` accepts far less than an environment variable can hold, and what it does with
+// the difference is never what was meant: `''` reaches it as `0`, which is the documented
+// way to ask for *any* free port, so an unset variable turns into a server on a port
+// nobody can predict — announced exactly like a healthy start. Everything else it rejects
+// from inside `node:net`, as a RangeError naming `options.port`, thrown before the
+// bootstrap's own `error` handler exists to say which variable was wrong.
+describe('resolvePort', () => {
+  const DEFAULT = 3001
+
+  it.each([
+    ['a plain port', '8080', 8080],
+    ['surrounding whitespace, as a shell or .env file leaves it', ' 8080 ', 8080],
+    ['0, the documented request for any free port', '0', 0],
+    ['the top of the range', '65535', 65535],
+  ])('takes %s', (_case, raw, expected) => {
+    expect(resolvePort(raw, DEFAULT)).toBe(expected)
+  })
+
+  // `PORT=` with nothing after it is how a variable arrives when whatever was meant to
+  // fill it did not: `docker run -e PORT`, a compose file interpolating an unset variable,
+  // an empty ConfigMap value. It says "nobody chose a port", which is what the default is
+  // for — and is the one bad value that would otherwise start a server successfully.
+  it.each([
+    ['the variable is absent', undefined],
+    ['the variable is empty', ''],
+    ['the variable holds only whitespace', '   '],
+  ])('falls back to the default when %s', (_case, raw) => {
+    expect(resolvePort(raw, DEFAULT)).toBe(DEFAULT)
+  })
+
+  // Refusing here rather than at `listen` is the difference between a message naming the
+  // variable and a stack trace through node internals. Both stop the process; only one
+  // tells the operator what to edit.
+  it.each([
+    ['not a number', 'abc'],
+    ['a number with a suffix', '8080abc'],
+    ['fractional', '3001.5'],
+    ['negative', '-1'],
+    ['above the range', '99999'],
+    ['hex, which `Number` would happily take', '0x1f90'],
+  ])('refuses a port that is %s, naming PORT and the value', (_case, raw) => {
+    expect(() => resolvePort(raw, DEFAULT)).toThrow(/PORT/)
+    expect(() => resolvePort(raw, DEFAULT)).toThrow(new RegExp(raw.trim()))
   })
 })
