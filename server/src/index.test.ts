@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -6,6 +7,23 @@ import { afterEach, describe, expect, it } from 'vitest'
 /** The bootstrap is run the way `npm start` runs it, because that is where it can fail. */
 const TSX = fileURLToPath(new URL('../../node_modules/.bin/tsx', import.meta.url))
 const BOOTSTRAP = fileURLToPath(new URL('./index.ts', import.meta.url))
+
+interface PackageManifest {
+  scripts: Record<string, string>
+  dependencies: Record<string, string>
+}
+
+const manifest: PackageManifest = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'),
+)
+
+/** Binaries the Node installation itself provides, which therefore need no package. */
+const PROVIDED_BY_NODE = ['node', 'npm', 'npx']
+
+/** The executable a script invokes, with any leading `NAME=value` assignments dropped. */
+function scriptBinary(script: string): string {
+  return script.split(/\s+/).find((token) => !/^\w+=/.test(token)) ?? ''
+}
 
 interface Bootstrap {
   output: () => string
@@ -96,4 +114,19 @@ describe('the server bootstrap', () => {
       release()
     }
   }, 30_000)
+})
+
+// Nothing compiles `server/src` — `tsconfig.server.json` is `noEmit` and there is no build
+// step for the server — so `npm start` runs the TypeScript itself through a runner. That
+// runner is as much a part of production as Express is, and `npm ci --omit=dev` installs
+// `dependencies` only: declared as a devDependency it is simply absent on the server, and
+// the documented start command dies with `sh: tsx: command not found` (status 127) before
+// a single request is served. Reproduced against a real `--omit=dev` install.
+describe('the production start command', () => {
+  it('invokes a binary that a production install still ships', () => {
+    const binary = scriptBinary(manifest.scripts.start)
+
+    expect(binary).not.toBe('')
+    expect([...PROVIDED_BY_NODE, ...Object.keys(manifest.dependencies)]).toContain(binary)
+  })
 })
